@@ -12,6 +12,7 @@
     reader: $("reader"),
     content: $("content"),
     empty: $("empty"),
+    progress: $("progress"),
   };
 
   const state = {
@@ -174,6 +175,7 @@
     els.empty.hidden = false;
     els.empty.querySelector("p").textContent = message || "Open a folder of Markdown files to start reading.";
     highlightCurrent();
+    scheduleProgress();
   }
 
   async function openDoc(path, { keepScroll = false, anchor = null, line = null, query = null } = {}) {
@@ -204,6 +206,7 @@
     } else {
       els.reader.scrollTop = 0;
     }
+    scheduleProgress();
   }
 
   function scrollToAnchor(id) {
@@ -470,6 +473,24 @@
     else if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
   });
   search.el.addEventListener("mousedown", (e) => { if (e.target === search.el) closeSearch(); });
+
+  // ---------- reading progress ----------
+  let progressRaf = 0;
+  function updateProgress() {
+    progressRaf = 0;
+    const r = els.reader;
+    const scrollable = r.scrollHeight - r.clientHeight;
+    if (!state.current || scrollable < 40) { els.progress.hidden = true; return; }
+    const pct = Math.round((r.scrollTop / scrollable) * 100);
+    els.progress.textContent = Math.min(100, Math.max(0, pct)) + "%";
+    els.progress.hidden = false;
+  }
+  function scheduleProgress() {
+    if (!progressRaf) progressRaf = requestAnimationFrame(updateProgress);
+  }
+  els.reader.addEventListener("scroll", scheduleProgress, { passive: true });
+  window.addEventListener("resize", scheduleProgress);
+  new ResizeObserver(scheduleProgress).observe(els.content);
 
   // ---------- sidebar resize ----------
   const SIDEBAR_DEFAULT = 260, SIDEBAR_MIN = 180, SIDEBAR_MAX = 560;

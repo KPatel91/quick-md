@@ -9,6 +9,7 @@ A fast, minimalist Markdown reader for macOS. Point it at a folder and read.
 - **GitHub-flavoured Markdown.** Tables, task lists, footnotes, strikethrough, alerts, autolinks, front matter.
 - **Code and diagrams.** Syntax highlighting is done in Rust at render time. Mermaid diagrams render in place.
 - **Light and dark.** Follows the system appearance.
+- **Reading progress.** A small percentage in the corner shows how far through the document you are.
 
 ## Build and run
 
