@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Quick MD</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="titlebar" data-tauri-drag-region>
+    <div class="tb-actions">
+      <button id="toggle-sidebar" class="tb-btn" title="Toggle sidebar (⌘⇧L)" aria-label="Toggle sidebar">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="2.2"/><path d="M6 2.5v11"/></svg>
+      </button>
+      <button id="open-folder" class="tb-btn" title="Open folder (⌘O)" aria-label="Open folder">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.5 4.5a1.5 1.5 0 0 1 1.5-1.5h3l1.5 1.5H13a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <div id="sidebar-head" data-tauri-drag-region></div>
+    <div id="folder-name" title=""></div>
+    <nav id="tree" aria-label="Files"></nav>
+  </aside>
+
+  <main id="reader">
+    <div id="empty">
+      <div class="empty-mark">M</div>
+      <p>Open a folder of Markdown files to start reading.</p>
+      <button id="empty-open" class="primary">Open Folder…</button>
+      <p class="hint">⌘O</p>
+    </div>
+    <article id="content" hidden></article>
+  </main>
+
+  <div id="search" hidden>
+    <div class="search-box" role="dialog" aria-label="Search in folder">
+      <input id="search-input" type="text" placeholder="Search in folder…" autocomplete="off" spellcheck="false" />
+      <div id="search-results"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
