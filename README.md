@@ -42,7 +42,7 @@ No Apple developer account is needed to build and run it on your own Mac. If you
 | Reload | ⌘ R |
 | Clear search highlights | Esc |
 
-You can also drop a folder or a `.md` file onto the window, or launch it from the terminal:
+Drag the sidebar's right edge to resize it; double-click the edge to reset. You can also drop a folder or a `.md` file onto the window, or launch it from the terminal:
 
 ```bash
 open -a "Quick MD" --args ~/notes

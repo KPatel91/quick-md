@@ -127,6 +127,7 @@ body {
 
 /* ---------- Sidebar ---------- */
 #sidebar {
+  position: relative;
   flex: 0 0 var(--sidebar-w);
   width: var(--sidebar-w);
   height: 100%;
@@ -140,6 +141,26 @@ body {
   transition: margin-left 0.18s ease;
 }
 body.sidebar-hidden #sidebar { margin-left: calc(-1 * var(--sidebar-w)); }
+body.resizing #sidebar { transition: none; }
+body.resizing { cursor: col-resize; }
+body.resizing #reader { pointer-events: none; }
+#sidebar-resizer {
+  position: absolute;
+  top: 0; right: -3px; bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  z-index: 25;
+}
+#sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 3px;
+  width: 1px;
+  background: var(--fg-muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#sidebar-resizer:hover::after, body.resizing #sidebar-resizer::after { opacity: 0.5; }
 body.sidebar-hidden .tb-actions { left: 84px; }
 #sidebar-head { height: var(--titlebar-h); flex: none; }
 #folder-name {

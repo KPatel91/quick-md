@@ -471,6 +471,36 @@
   });
   search.el.addEventListener("mousedown", (e) => { if (e.target === search.el) closeSearch(); });
 
+  // ---------- sidebar resize ----------
+  const SIDEBAR_DEFAULT = 260, SIDEBAR_MIN = 180, SIDEBAR_MAX = 560;
+  function setSidebarWidth(w) {
+    w = Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)));
+    document.documentElement.style.setProperty("--sidebar-w", w + "px");
+    return w;
+  }
+  (() => {
+    const handle = $("sidebar-resizer");
+    let startX = 0, startW = 0, width = prefs.get("sidebarWidth", SIDEBAR_DEFAULT);
+    setSidebarWidth(width);
+    handle.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      startX = e.clientX;
+      startW = width;
+      els.body.classList.add("resizing");
+      const move = (ev) => { width = setSidebarWidth(startW + ev.clientX - startX); };
+      const up = () => {
+        els.body.classList.remove("resizing");
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        prefs.set("sidebarWidth", width);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    });
+    handle.addEventListener("dblclick", () => { width = setSidebarWidth(SIDEBAR_DEFAULT); prefs.set("sidebarWidth", width); });
+  })();
+
   // ---------- keyboard ----------
   window.addEventListener("keydown", (e) => {
     const mod = e.metaKey;
