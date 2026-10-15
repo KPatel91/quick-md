@@ -43,6 +43,13 @@
         "name": "Markdown",
         "description": "Markdown document",
         "role": "Viewer"
+      },
+      {
+        "ext": [],
+        "contentTypes": ["public.folder"],
+        "name": "Folder",
+        "description": "Folder of Markdown files",
+        "role": "Viewer"
       }
     ]
   }

@@ -22,6 +22,7 @@
     current: null,       // absolute path of the open document
     collapsed: new Set(),// dir paths that are collapsed
     mermaidReady: null,  // Promise once mermaid.min.js is loaded
+    sort: "name",        // "name" (A–Z) or "modified" (newest first)
   };
 
   const prefs = {
@@ -70,12 +71,41 @@
     return out;
   }
 
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+
+  // Folders stay above files. Within each group: A–Z, or newest-modified first
+  // (a folder's date is the newest file inside it).
+  function sortNodes(nodes) {
+    const cmp = state.sort === "modified"
+      ? (a, b) => (b.modified - a.modified) || byName(a, b)
+      : byName;
+    return nodes
+      .map((n) => (n.kind === "dir" ? { ...n, children: sortNodes(n.children) } : n))
+      .sort((a, b) => (a.kind === "dir" ? 0 : 1) - (b.kind === "dir" ? 0 : 1) || cmp(a, b));
+  }
+
   function renderTree() {
+    const sorted = sortNodes(state.tree);
     els.tree.innerHTML = "";
-    els.tree.appendChild(buildList(state.tree, 0));
-    state.files = flatten(state.tree);
+    els.tree.appendChild(buildList(sorted, 0));
+    state.files = flatten(sorted);
     highlightCurrent();
   }
+
+  const sortToggle = $("sort-toggle");
+  function updateSortButton() {
+    const byDate = state.sort === "modified";
+    sortToggle.textContent = byDate ? "Newest" : "Name";
+    sortToggle.title = byDate
+      ? "Sorted by date modified, newest first. Click to sort by name."
+      : "Sorted by name. Click to sort by date modified.";
+  }
+  sortToggle.addEventListener("click", () => {
+    state.sort = state.sort === "modified" ? "name" : "modified";
+    prefs.set("sort", state.sort);
+    updateSortButton();
+    renderTree();
+  });
 
   function buildList(nodes, depth) {
     const ul = document.createElement("ul");
@@ -136,15 +166,34 @@
     prefs.set("lastRoot", state.root);
   }
 
-  async function pickFolder() {
-    const dir = await dialog.open({ directory: true, multiple: false, title: "Open Folder" });
-    if (!dir) return;
+  // Show a folder returned by Rust; if a specific file was opened, go to it.
+  async function showFolder(folder) {
+    setFolder(folder);
+    if (folder.openFile) await openDoc(folder.openFile);
+    else await openInitialDoc();
+  }
+
+  async function openFolderPath(path) {
     try {
-      const folder = await invoke("open_folder", { path: dir });
+      const folder = await invoke("open_folder", { path });
       setFolder(folder);
       await openInitialDoc();
     } catch (e) {
       toast(String(e));
+    }
+  }
+
+  // ⌘O can arrive from both the native menu and the keydown handler; only
+  // let one dialog open at a time.
+  let picking = false;
+  async function pickFolder() {
+    if (picking) return;
+    picking = true;
+    try {
+      const dir = await dialog.open({ directory: true, multiple: false, title: "Open Folder" });
+      if (dir) await openFolderPath(dir);
+    } finally {
+      picking = false;
     }
   }
 
@@ -558,6 +607,14 @@
     });
   });
 
+  // File menu: Open Folder… and Open Recent.
+  event.listen("menu-open-folder", () => pickFolder());
+  event.listen("menu-open-recent", ({ payload }) => { if (payload) openFolderPath(payload); });
+
+  // Files or folders dropped on the Dock icon, or opened from Finder.
+  event.listen("open-external", ({ payload }) => { if (payload) showFolder(payload); });
+  event.listen("open-error", ({ payload }) => toast(String(payload)));
+
   // Drag-and-drop a folder onto the window.
   event.listen("tauri://drag-drop", async ({ payload }) => {
     const p = payload?.paths?.[0];
@@ -571,14 +628,13 @@
 
   // ---------- startup ----------
   (async () => {
+    state.sort = prefs.get("sort", "name") === "modified" ? "modified" : "name";
+    updateSortButton();
     setZoom(prefs.get("zoom", 1));
     setSidebar(prefs.get("sidebar", true));
     try {
       const folder = await invoke("startup");
-      if (folder) {
-        setFolder(folder);
-        await openInitialDoc();
-      }
+      if (folder) await showFolder(folder);
     } catch (e) {
       toast(String(e));
     }

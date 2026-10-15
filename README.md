@@ -5,6 +5,8 @@ A fast, minimalist Markdown reader for macOS. Point it at a folder and read.
 - **Tiny and quick.** Rust backend, the system WebKit for rendering, no bundled browser. The app is a few megabytes and opens instantly.
 - **Reads, doesn't edit.** No toolbar, no modes. Just your notes, typeset.
 - **Folder-aware.** A collapsible sidebar lists every `.md` file in the folder tree. Files update live when they change on disk.
+- **Open Recent.** File → Open Recent remembers your last ten folders.
+- **Sortable sidebar.** Toggle the sidebar between name order and newest-modified first. Folders always stay on top.
 - **Folder search.** ⌘F searches every file in the folder. Pick a hit and it opens the file at that exact line with the match highlighted.
 - **GitHub-flavoured Markdown.** Tables, task lists, footnotes, strikethrough, alerts, autolinks, front matter.
 - **Code and diagrams.** Syntax highlighting is done in Rust at render time. Mermaid diagrams render in place.
@@ -35,7 +37,7 @@ No Apple developer account is needed to build and run it on your own Mac. If you
 
 | Action | Shortcut |
 |---|---|
-| Open folder | ⌘ O |
+| Open folder | ⌘ O (or File → Open Recent) |
 | Search the whole folder | ⌘ F |
 | Toggle sidebar | ⌘ ⇧ L |
 | Next / previous file | ⌥ ↓ / ⌥ ↑ |

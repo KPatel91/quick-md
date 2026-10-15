@@ -13,11 +13,15 @@ pub enum Node {
     Dir {
         name: String,
         path: PathBuf,
+        /// Newest modification time (ms since epoch) of anything inside.
+        modified: u64,
         children: Vec<Node>,
     },
     File {
         name: String,
         path: PathBuf,
+        /// Modification time in ms since the epoch.
+        modified: u64,
     },
 }
 
@@ -25,6 +29,12 @@ impl Node {
     fn name(&self) -> &str {
         match self {
             Node::Dir { name, .. } | Node::File { name, .. } => name,
+        }
+    }
+    #[cfg(test)]
+    fn modified(&self) -> u64 {
+        match self {
+            Node::Dir { modified, .. } | Node::File { modified, .. } => *modified,
         }
     }
     fn is_dir(&self) -> bool {
@@ -37,6 +47,14 @@ pub fn is_markdown(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref(),
         Some("md") | Some("markdown") | Some("mdown") | Some("mkd")
     )
+}
+
+fn mtime_ms(meta: &fs::Metadata) -> u64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn is_hidden(name: &str) -> bool {
@@ -74,10 +92,17 @@ fn build_dir(dir: &Path, depth: usize) -> Vec<Node> {
             }
             let children = build_dir(&path, depth + 1);
             if !children.is_empty() {
-                nodes.push(Node::Dir { name, path, children });
+                let modified = children
+                    .iter()
+                    .map(|c| match c {
+                        Node::Dir { modified, .. } | Node::File { modified, .. } => *modified,
+                    })
+                    .max()
+                    .unwrap_or(0);
+                nodes.push(Node::Dir { name, path, modified, children });
             }
         } else if meta.is_file() && is_markdown(&path) {
-            nodes.push(Node::File { name, path });
+            nodes.push(Node::File { name, path, modified: mtime_ms(&meta) });
         }
     }
 
@@ -126,6 +151,21 @@ mod tests {
             }
             _ => panic!("expected dir"),
         }
+        let _ = fs::remove_dir_all(&root);
+    }
+    #[test]
+    fn files_carry_mtimes_and_dirs_take_the_newest_child() {
+        let root = std::env::temp_dir().join(format!("quickmd-mtime-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        create_dir_all(root.join("sub")).unwrap();
+        write(root.join("sub/a.md"), "").unwrap();
+        write(root.join("b.md"), "").unwrap();
+
+        let tree = build(&root);
+        let Node::Dir { children, modified, .. } = &tree[0] else { panic!("expected dir first") };
+        assert!(*modified > 0);
+        assert_eq!(*modified, children[0].modified());
+        assert!(tree[1].modified() > 0);
         let _ = fs::remove_dir_all(&root);
     }
 }

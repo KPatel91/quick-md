@@ -1,13 +1,17 @@
-use crate::{render, tree, watcher, AppState};
-use serde::{Deserialize, Serialize};
+use crate::{menu, recents, render, tree, watcher, AppState};
+use serde::Serialize;
+use std::sync::atomic::Ordering;
+use tauri::Emitter;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Folder {
     pub root: PathBuf,
     pub tree: Vec<tree::Node>,
+    /// A specific document to show first (set when a file was opened directly).
+    pub open_file: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -21,33 +25,6 @@ pub struct Hit {
 pub struct Doc {
     pub html: String,
     pub title: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Persisted {
-    last_root: PathBuf,
-}
-
-fn config_file(app: &AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("state.json"))
-}
-
-fn remember(app: &AppHandle, root: &Path) {
-    if let Some(file) = config_file(app) {
-        if let Some(dir) = file.parent() {
-            let _ = fs::create_dir_all(dir);
-        }
-        if let Ok(json) = serde_json::to_string(&Persisted { last_root: root.to_path_buf() }) {
-            let _ = fs::write(file, json);
-        }
-    }
-}
-
-fn recall(app: &AppHandle) -> Option<PathBuf> {
-    let file = config_file(app)?;
-    let json = fs::read_to_string(file).ok()?;
-    let p: Persisted = serde_json::from_str(&json).ok()?;
-    p.last_root.is_dir().then_some(p.last_root)
 }
 
 /// Set `path` as the active root: scope the asset protocol to it, start
@@ -64,33 +41,76 @@ fn activate(app: &AppHandle, state: &AppState, path: PathBuf) -> Result<Folder, 
     let handle = watcher::watch(app.clone(), &root)?;
     *state.watcher.lock().unwrap() = Some(handle);
     *state.root.lock().unwrap() = Some(root.clone());
-    remember(app, &root);
+    recents::remember(app, &root);
+    menu::refresh(app);
 
     let tree = tree::build(&root);
-    Ok(Folder { root, tree })
+    Ok(Folder { root, tree, open_file: None })
 }
 
-/// Called once by the front-end on load. Opens the folder given on the command
-/// line, else the last folder used, else nothing.
+/// Open a folder, or a Markdown file via its parent folder with the file selected.
+fn open_target(app: &AppHandle, state: &AppState, target: PathBuf) -> Result<Folder, String> {
+    if target.is_file() && tree::is_markdown(&target) {
+        let file = fs::canonicalize(&target).map_err(|e| format!("{}: {e}", target.display()))?;
+        let parent = file.parent().ok_or("file has no parent folder")?.to_path_buf();
+        let mut folder = activate(app, state, parent)?;
+        folder.open_file = Some(file);
+        Ok(folder)
+    } else if target.is_dir() {
+        activate(app, state, target)
+    } else {
+        Err(format!("{} is not a folder or Markdown file", target.display()))
+    }
+}
+
+/// macOS "open" events: files or folders dropped on the Dock icon, or opened
+/// from Finder. If the page is already running, tell it; otherwise park the
+/// result for `startup` to pick up.
+#[cfg(target_os = "macos")]
+pub fn handle_opened(app: &AppHandle, urls: Vec<tauri::Url>) {
+    let state = app.state::<AppState>();
+    let Some(path) = urls.iter().find_map(|u| u.to_file_path().ok()) else { return };
+    match open_target(app, &state, path) {
+        Ok(folder) => {
+            if state.ready.load(Ordering::SeqCst) {
+                let _ = app.emit("open-external", &folder);
+            } else {
+                *state.launch.lock().unwrap() = Some(folder);
+            }
+        }
+        Err(e) => {
+            let _ = app.emit("open-error", e);
+        }
+    }
+}
+
+/// Called once by the front-end on load. Shows whatever the app was launched
+/// with (Dock drop, Finder, command line), else the last folder used.
 #[tauri::command]
 pub fn startup(app: AppHandle, state: State<'_, AppState>) -> Result<Option<Folder>, String> {
-    let from_args = std::env::args_os()
-        .nth(1)
-        .map(PathBuf::from)
-        .filter(|p| p.is_dir() || (p.is_file() && tree::is_markdown(p)));
-    let candidate = from_args.or_else(|| recall(&app));
-    let Some(candidate) = candidate else { return Ok(None) };
-    let root = if candidate.is_file() {
-        candidate.parent().map(Path::to_path_buf).unwrap_or(candidate)
-    } else {
-        candidate
-    };
-    activate(&app, &state, root).map(Some)
+    state.ready.store(true, Ordering::SeqCst);
+    if let Some(folder) = state.launch.lock().unwrap().take() {
+        return Ok(Some(folder));
+    }
+    let from_args = std::env::args_os().nth(1).map(PathBuf::from);
+    if let Some(target) = from_args.filter(|p| p.is_dir() || tree::is_markdown(p)) {
+        return open_target(&app, &state, target).map(Some);
+    }
+    match recents::last(&app) {
+        Some(root) => activate(&app, &state, root).map(Some),
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]
 pub fn open_folder(app: AppHandle, state: State<'_, AppState>, path: PathBuf) -> Result<Folder, String> {
-    activate(&app, &state, path)
+    let result = activate(&app, &state, path.clone());
+    if result.is_err() {
+        // A recent folder that was moved or deleted: drop it from the menu.
+        recents::forget(&app, &path);
+        menu::refresh(&app);
+    }
+    result
 }
 
 #[tauri::command]

@@ -163,8 +163,15 @@ body.resizing #reader { pointer-events: none; }
 #sidebar-resizer:hover::after, body.resizing #sidebar-resizer::after { opacity: 0.5; }
 body.sidebar-hidden .tb-actions { left: 84px; }
 #sidebar-head { height: var(--titlebar-h); flex: none; }
+#folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 6px 16px;
+}
 #folder-name {
-  padding: 0 16px 6px;
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -174,6 +181,21 @@ body.sidebar-hidden .tb-actions { left: 84px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+#sort-toggle {
+  flex: none;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--sidebar-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 5px;
+  cursor: default;
+}
+#sort-toggle:hover { background: var(--btn-hover); color: var(--sidebar-fg); }
+#sort-toggle:active { opacity: 0.6; }
 #tree {
   flex: 1;
   overflow-y: auto;
