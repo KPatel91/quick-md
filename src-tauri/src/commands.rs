@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")] // the front-end reads `openFile`
 pub struct Folder {
     pub root: PathBuf,
     pub tree: Vec<tree::Node>,
@@ -199,4 +200,17 @@ fn snippet(line: &str, byte_pos: usize, needle_len: usize) -> String {
     if end < chars.len() { out.push('…'); }
     let _ = needle_len;
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn folder_serializes_open_file_in_camel_case() {
+        let folder = Folder { root: "/r".into(), tree: vec![], open_file: Some("/r/a.md".into()) };
+        let v = serde_json::to_value(&folder).unwrap();
+        assert_eq!(v["openFile"], "/r/a.md");
+        assert!(v.get("open_file").is_none());
+    }
 }
